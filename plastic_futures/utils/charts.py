@@ -44,7 +44,6 @@ def _base_layout(title: str = "", height: int = 420) -> dict:
         font=dict(family="Inter, sans-serif", size=11, color=DARK_NAVY),
         xaxis=dict(gridcolor="#E8E8E0", linecolor="#D0D0C8"),
         yaxis=dict(gridcolor="#E8E8E0", linecolor="#D0D0C8"),
-        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)"),
     )
 
 
@@ -119,6 +118,7 @@ def fan_chart(
 
     layout = _base_layout(title, height=430)
     layout["yaxis"]["title"] = unit
+    layout["legend"] = dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)")
     fig.update_layout(**layout)
     return fig
 
@@ -146,7 +146,8 @@ def multi_product_lines(
         ))
     layout = _base_layout(title, height=380)
     layout["yaxis"]["title"] = "€/ton"
-    layout["legend"] = dict(orientation="h", yanchor="bottom", y=1.02)
+    layout["legend"] = dict(orientation="h", yanchor="bottom", y=1.02,
+                            bgcolor="rgba(0,0,0,0)")
     fig.update_layout(**layout)
     return fig
 
@@ -227,7 +228,8 @@ def scenario_chart(
     fig.add_vline(x=last_date, line_dash="dot", line_color=MID_GRAY, line_width=1.5)
     layout = _base_layout(title, height=430)
     layout["yaxis"]["title"] = "€/ton"
-    layout["legend"] = dict(orientation="h", yanchor="bottom", y=1.02)
+    layout["legend"] = dict(orientation="h", yanchor="bottom", y=1.02,
+                            bgcolor="rgba(0,0,0,0)")
     fig.update_layout(**layout)
     return fig
 
@@ -348,6 +350,7 @@ def monte_carlo_chart(
     fig.add_vline(x=last_date, line_dash="dot", line_color=MID_GRAY, line_width=1.5)
     layout = _base_layout(title, height=420)
     layout["yaxis"]["title"] = "€/ton"
+    layout["legend"] = dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)")
     fig.update_layout(**layout)
     return fig
 
@@ -374,12 +377,12 @@ def tornado_chart(sensitivity_df: pd.DataFrame, title: str = "Análisis de sensi
         marker_color=DANGER_RED,
         hovertemplate="%{y}<br>Impacto: +%{x:.1f} €/ton<extra></extra>",
     ))
-    fig.update_layout(
-        **_base_layout(title, height=380),
-        barmode="overlay",
-        xaxis_title="Impacto en precio (€/ton)",
-        bargap=0.25,
-    )
+    layout = _base_layout(title, height=380)
+    layout["barmode"] = "overlay"
+    layout["xaxis_title"] = "Impacto en precio (€/ton)"
+    layout["bargap"] = 0.25
+    layout["legend"] = dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)")
+    fig.update_layout(**layout)
     fig.add_vline(x=0, line_color=DARK_NAVY, line_width=1.5)
     return fig
 
@@ -420,11 +423,11 @@ def backtest_chart(backtest_df: pd.DataFrame, title: str = "Backtesting walk-for
         text=[f"{v:.0f}%" for v in backtest_df["confidence"]],
         textposition="outside",
     ), row=1, col=2)
-    fig.update_layout(
-        **_base_layout(title, height=360),
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.3),
-    )
+    layout = _base_layout(title, height=360)
+    layout["showlegend"] = True
+    layout["legend"] = dict(orientation="h", yanchor="bottom", y=-0.3,
+                            bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(**layout)
     return fig
 
 
@@ -502,9 +505,8 @@ def buy_vs_wait_chart(buy_wait_df: pd.DataFrame, title: str = "Coste: Comprar ah
     ), row=2, col=1)
     fig.add_hline(y=0, row=2, col=1, line_dash="dot", line_color=DARK_NAVY, line_width=1)
 
-    fig.update_layout(
-        **_base_layout(title, height=440),
-        showlegend=True,
-        legend=dict(orientation="h", y=1.06),
-    )
+    layout = _base_layout(title, height=440)
+    layout["showlegend"] = True
+    layout["legend"] = dict(orientation="h", y=1.06, bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(**layout)
     return fig
