@@ -1,274 +1,473 @@
 """
-CSS injection and UI helpers — Minnesota Vikings theme.
+CSS injection and UI helpers.
+Vikings palette — light sidebar for full legibility of all native Streamlit components.
 """
 
 from __future__ import annotations
 import streamlit as st
 from config.settings import (
     VIKINGS_PURPLE, VIKINGS_GOLD, VIKINGS_MID, VIKINGS_DARK, VIKINGS_LIGHT,
-    IVORY_DARK, SUCCESS_GREEN, WARNING_AMBER, DANGER_RED, MID_GRAY,
+    IVORY_DARK, SUCCESS_GREEN, DANGER_RED,
     APP_TITLE, APP_SUBTITLE,
-    # Aliases used throughout the rest of the code
-    REPSOL_ORANGE, REPSOL_MAGENTA, REPSOL_BLUE, IVORY, DARK_NAVY,
+    REPSOL_ORANGE, REPSOL_BLUE, IVORY, DARK_NAVY,
 )
 
-
 # ---------------------------------------------------------------------------
-# Main CSS injection
+# CSS
 # ---------------------------------------------------------------------------
 
 def apply_custom_css() -> None:
-    st.markdown(
-        f"""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    st.markdown(f"""
+    <style>
+    /* ═══════════════════════════════════════════════════════════
+       BASE
+    ═══════════════════════════════════════════════════════════ */
+    html, body, [data-testid="stAppViewContainer"] {{
+        background-color: #F8F6FF;
+        font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+    }}
 
-        /* ---- Base ---- */
-        html, body, [data-testid="stAppViewContainer"] {{
-            background-color: {VIKINGS_LIGHT};
-            font-family: 'Inter', 'Segoe UI', sans-serif;
-        }}
+    /* Remove default top padding from main content */
+    .block-container {{
+        padding-top: 1.2rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1400px;
+    }}
 
-        /* ---- Sidebar ---- */
-        [data-testid="stSidebar"] {{
-            background: linear-gradient(180deg, {VIKINGS_DARK} 0%, {VIKINGS_PURPLE} 100%);
-        }}
-        [data-testid="stSidebar"] * {{
-            color: #E8E0FF !important;
-        }}
-        [data-testid="stSidebar"] .stSelectbox label,
-        [data-testid="stSidebar"] .stMultiSelect label,
-        [data-testid="stSidebar"] .stSlider label,
-        [data-testid="stSidebar"] .stRadio label {{
-            color: #C9B8F0 !important;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }}
+    /* ═══════════════════════════════════════════════════════════
+       SIDEBAR  —  DARK purple background, full white text
+    ═══════════════════════════════════════════════════════════ */
+    [data-testid="stSidebar"] {{
+        background: {VIKINGS_DARK} !important;
+        border-right: 1px solid {VIKINGS_PURPLE};
+        box-shadow: 2px 0 16px rgba(0,0,0,0.25);
+    }}
 
-        /* ---- Tab bar ---- */
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 4px;
-            background: {IVORY_DARK};
-            border-radius: 12px;
-            padding: 4px;
-        }}
-        .stTabs [data-baseweb="tab"] {{
-            border-radius: 8px;
-            padding: 8px 16px;
-            font-weight: 600;
-            font-size: 0.82rem;
-            color: {VIKINGS_DARK};
-            background: transparent;
-        }}
-        .stTabs [aria-selected="true"] {{
-            background: {VIKINGS_PURPLE} !important;
-            color: white !important;
-        }}
+    /* All text elements white */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] *,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] div,
+    [data-testid="stSidebar"] .stMarkdown {{
+        color: rgba(255,255,255,0.92) !important;
+    }}
 
-        /* ---- KPI card ---- */
-        .kpi-card {{
-            background: white;
-            border-left: 4px solid {VIKINGS_GOLD};
-            border-radius: 10px;
-            padding: 18px 20px;
-            box-shadow: 0 2px 10px rgba(79,38,131,0.10);
-            margin-bottom: 8px;
-        }}
-        .kpi-label {{
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: {VIKINGS_PURPLE};
-            font-weight: 700;
-            margin-bottom: 4px;
-        }}
-        .kpi-value {{
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: {VIKINGS_DARK};
-            line-height: 1.1;
-        }}
-        .kpi-delta {{
-            font-size: 0.78rem;
-            font-weight: 600;
-            margin-top: 4px;
-        }}
-        .kpi-delta.pos {{ color: {SUCCESS_GREEN}; }}
-        .kpi-delta.neg {{ color: {DANGER_RED}; }}
-        .kpi-delta.neu {{ color: {VIKINGS_MID}; }}
+    /* Component labels — soft gold uppercase */
+    [data-testid="stSidebar"] .stSelectbox label,
+    [data-testid="stSidebar"] .stMultiSelect label,
+    [data-testid="stSidebar"] .stSlider label,
+    [data-testid="stSidebar"] .stRadio label,
+    [data-testid="stSidebar"] .stNumberInput label {{
+        color: {VIKINGS_GOLD} !important;
+        font-size: 0.73rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }}
 
-        /* ---- Section header ---- */
-        .section-header {{
-            font-size: 1.0rem;
-            font-weight: 700;
-            color: {VIKINGS_PURPLE};
-            border-bottom: 2px solid {VIKINGS_GOLD};
-            padding-bottom: 6px;
-            margin: 20px 0 14px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }}
+    /* Select / multiselect boxes */
+    [data-testid="stSidebar"] [data-baseweb="select"] > div,
+    [data-testid="stSidebar"] [data-baseweb="input"] {{
+        background: rgba(255,255,255,0.10) !important;
+        border-color: rgba(255,255,255,0.25) !important;
+        border-radius: 6px !important;
+    }}
+    [data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stSidebar"] [data-baseweb="select"] span {{
+        color: white !important;
+    }}
 
-        /* ---- Risk badge ---- */
-        .risk-badge {{
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-        }}
-        .risk-high   {{ background:#fde9e5; color:{DANGER_RED}; }}
-        .risk-medio  {{ background:#fff8e1; color:#B7860B; }}
-        .risk-bajo   {{ background:#e8f8f5; color:#00845E; }}
+    /* Slider track & thumb */
+    [data-testid="stSidebar"] [data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {{
+        background: {VIKINGS_GOLD} !important;
+        border-color: {VIKINGS_GOLD} !important;
+    }}
+    [data-testid="stSidebar"] .stSlider [data-baseweb="slider"] > div > div:first-child {{
+        background: rgba(255,255,255,0.20) !important;
+    }}
+    [data-testid="stSidebar"] .stSlider [data-baseweb="slider"] > div > div:nth-child(2) {{
+        background: {VIKINGS_GOLD} !important;
+    }}
 
-        /* ---- Alert box ---- */
-        .alert-box {{
-            border-left: 4px solid {VIKINGS_GOLD};
-            background: #FFF9E6;
-            border-radius: 6px;
-            padding: 10px 14px;
-            margin: 6px 0;
-            font-size: 0.82rem;
-        }}
-        .alert-box.high {{
-            border-color: {DANGER_RED};
-            background: #FFF0ED;
-        }}
-        .alert-box.low {{
-            border-color: {SUCCESS_GREEN};
-            background: #EBF9F4;
-        }}
+    /* Multi-select tags */
+    [data-testid="stSidebar"] [data-baseweb="tag"] {{
+        background: {VIKINGS_PURPLE} !important;
+        border: 1px solid rgba(255,255,255,0.30) !important;
+    }}
+    [data-testid="stSidebar"] [data-baseweb="tag"] span {{
+        color: white !important;
+    }}
 
-        /* ---- App header ---- */
-        .app-header {{
-            background: linear-gradient(135deg,
-                {VIKINGS_DARK} 0%,
-                {VIKINGS_PURPLE} 45%,
-                {VIKINGS_MID} 75%,
-                {VIKINGS_GOLD} 100%);
-            border-radius: 14px;
-            padding: 22px 28px;
-            margin-bottom: 20px;
-            color: white;
-        }}
-        .app-header h1 {{
-            font-size: 1.7rem;
-            font-weight: 800;
-            margin: 0 0 4px 0;
-            color: white;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.25);
-        }}
-        .app-header p {{
-            font-size: 0.85rem;
-            margin: 0;
-            opacity: 0.88;
-        }}
+    /* Tooltip icons */
+    [data-testid="stSidebar"] [data-testid="stTooltipIcon"] svg {{
+        fill: rgba(255,255,255,0.50) !important;
+    }}
 
-        /* ---- Guide / model explanation cards ---- */
-        .guide-card {{
-            background: white;
-            border-top: 3px solid {VIKINGS_PURPLE};
-            border-radius: 10px;
-            padding: 16px 18px;
-            box-shadow: 0 2px 8px rgba(79,38,131,0.08);
-            margin-bottom: 12px;
-        }}
-        .guide-card h4 {{
-            color: {VIKINGS_PURPLE};
-            font-size: 0.9rem;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }}
-        .guide-card p, .guide-card li {{
-            color: {VIKINGS_DARK};
-            font-size: 0.82rem;
-            line-height: 1.55;
-        }}
+    /* Section dividers */
+    [data-testid="stSidebar"] hr {{
+        border-color: rgba(255,255,255,0.15);
+        margin: 12px 0;
+    }}
 
-        /* ---- Threshold badge ---- */
-        .thresh-excellent {{ color:#00845E; font-weight:700; }}
-        .thresh-good      {{ color:{VIKINGS_PURPLE}; font-weight:600; }}
-        .thresh-warn      {{ color:#B7860B; font-weight:600; }}
-        .thresh-bad       {{ color:{DANGER_RED}; font-weight:600; }}
+    /* Collapse arrow */
+    [data-testid="stSidebarCollapseButton"] svg {{
+        fill: white !important;
+    }}
+    [data-testid="stSidebarCollapseButton"] {{
+        background: rgba(255,255,255,0.08) !important;
+    }}
 
-        /* ---- Chat bubble ---- */
-        .chat-user {{
-            background: {IVORY_DARK};
-            border-radius: 12px 12px 4px 12px;
-            padding: 10px 14px;
-            margin: 8px 60px 8px 0;
-            font-size: 0.88rem;
-            border-left: 3px solid {VIKINGS_MID};
-        }}
-        .chat-assistant {{
-            background: white;
-            border-left: 3px solid {VIKINGS_GOLD};
-            border-radius: 4px 12px 12px 12px;
-            padding: 12px 16px;
-            margin: 8px 0 8px 60px;
-            font-size: 0.88rem;
-            box-shadow: 0 1px 6px rgba(79,38,131,0.08);
-        }}
+    /* ── Slider & select_slider on dark sidebar ── */
 
-        /* ---- Metric override ---- */
-        [data-testid="metric-container"] {{
-            background: white;
-            border-radius: 10px;
-            padding: 14px !important;
-            box-shadow: 0 2px 8px rgba(79,38,131,0.07);
-        }}
+    /* Thumb circle */
+    [data-testid="stSidebar"] [data-baseweb="slider"] [role="slider"] {{
+        background: {VIKINGS_GOLD} !important;
+        border-color: {VIKINGS_GOLD} !important;
+        box-shadow: 0 0 0 4px rgba(255,198,47,0.22) !important;
+        width: 18px !important;
+        height: 18px !important;
+    }}
+    /* Filled track */
+    [data-testid="stSidebar"] [data-baseweb="slider"] > div > div:nth-child(2) {{
+        background: {VIKINGS_GOLD} !important;
+    }}
+    /* Empty track */
+    [data-testid="stSidebar"] [data-baseweb="slider"] > div > div:first-child {{
+        background: rgba(255,255,255,0.20) !important;
+        height: 4px !important;
+        border-radius: 4px !important;
+    }}
 
-        /* ---- Time filter pill ---- */
-        .time-filter-bar {{
-            background: white;
-            border-radius: 8px;
-            padding: 8px 14px;
-            margin-bottom: 12px;
-            border: 1px solid {IVORY_DARK};
-            font-size: 0.78rem;
-            color: {VIKINGS_MID};
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    /* Tick labels below slider (min / max) */
+    [data-testid="stSidebar"] [data-testid="stTickBar"] span,
+    [data-testid="stSidebar"] [data-testid="stTickBar"] div {{
+        color: rgba(255,255,255,0.60) !important;
+        background: transparent !important;
+        font-size: 0.70rem !important;
+        font-weight: 500 !important;
+    }}
+    /* Current-value label above thumb */
+    [data-testid="stSidebar"] [data-baseweb="tooltip"] > div {{
+        background: {VIKINGS_PURPLE} !important;
+        border-radius: 5px !important;
+        padding: 2px 8px !important;
+    }}
+    [data-testid="stSidebar"] [data-baseweb="tooltip"] span,
+    [data-testid="stSidebar"] [data-baseweb="tooltip"] div {{
+        color: white !important;
+        font-size: 0.72rem !important;
+        font-weight: 600 !important;
+        background: transparent !important;
+    }}
+
+    /* select_slider: kill the orange pill on extreme values */
+    [data-testid="stSidebar"] [data-testid="stSlider"] li {{
+        background: transparent !important;
+        color: rgba(255,255,255,0.60) !important;
+        font-size: 0.70rem !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stSlider"] li[aria-selected="true"],
+    [data-testid="stSidebar"] [data-testid="stSlider"] li[data-selected="true"] {{
+        background: transparent !important;
+        color: {VIKINGS_GOLD} !important;
+        font-weight: 700 !important;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       TAB BAR
+    ═══════════════════════════════════════════════════════════ */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 3px;
+        background: #EDE8F8;
+        border-radius: 10px;
+        padding: 4px;
+        border: 1px solid #DDD5F3;
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 7px;
+        padding: 7px 15px;
+        font-weight: 600;
+        font-size: 0.80rem;
+        color: {VIKINGS_MID};
+        background: transparent;
+        border: none;
+        transition: all 0.15s ease;
+    }}
+    .stTabs [aria-selected="true"] {{
+        background: {VIKINGS_PURPLE} !important;
+        color: white !important;
+        box-shadow: 0 2px 6px rgba(79,38,131,0.25);
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       KPI CARD
+    ═══════════════════════════════════════════════════════════ */
+    .kpi-card {{
+        background: #FFFFFF;
+        border-left: 3px solid {VIKINGS_GOLD};
+        border-radius: 8px;
+        padding: 16px 18px 14px 18px;
+        box-shadow: 0 1px 6px rgba(79,38,131,0.08);
+        margin-bottom: 0;
+        height: 100%;
+    }}
+    .kpi-label {{
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: {VIKINGS_MID};
+        font-weight: 700;
+        margin-bottom: 6px;
+    }}
+    .kpi-value {{
+        font-size: 1.65rem;
+        font-weight: 800;
+        color: {VIKINGS_DARK};
+        line-height: 1.1;
+        letter-spacing: -0.5px;
+    }}
+    .kpi-delta {{
+        font-size: 0.74rem;
+        font-weight: 600;
+        margin-top: 5px;
+    }}
+    .kpi-delta.pos {{ color: {SUCCESS_GREEN}; }}
+    .kpi-delta.neg {{ color: {DANGER_RED}; }}
+    .kpi-delta.neu {{ color: {VIKINGS_MID}; }}
+
+    /* ═══════════════════════════════════════════════════════════
+       SECTION HEADER
+    ═══════════════════════════════════════════════════════════ */
+    .section-header {{
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: {VIKINGS_PURPLE};
+        border-bottom: 2px solid {VIKINGS_GOLD};
+        padding-bottom: 5px;
+        margin: 22px 0 14px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       APP HEADER
+    ═══════════════════════════════════════════════════════════ */
+    .app-header {{
+        background: linear-gradient(115deg, {VIKINGS_DARK} 0%, {VIKINGS_PURPLE} 55%, {VIKINGS_MID} 100%);
+        border-radius: 10px;
+        padding: 20px 28px 18px 28px;
+        margin-bottom: 18px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }}
+    .app-header::after {{
+        content: '';
+        position: absolute;
+        right: -20px; top: -20px;
+        width: 160px; height: 160px;
+        background: radial-gradient(circle, rgba(255,198,47,0.18) 0%, transparent 70%);
+        border-radius: 50%;
+    }}
+    .app-header h1 {{
+        font-size: 1.55rem;
+        font-weight: 800;
+        margin: 0 0 3px 0;
+        color: white;
+        letter-spacing: -0.3px;
+    }}
+    .app-header p {{
+        font-size: 0.82rem;
+        margin: 0;
+        color: rgba(255,255,255,0.78);
+        font-weight: 400;
+    }}
+    .app-header .gold-pill {{
+        display: inline-block;
+        background: {VIKINGS_GOLD};
+        color: {VIKINGS_DARK};
+        font-size: 0.62rem;
+        font-weight: 800;
+        padding: 2px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.06em;
+        margin-left: 10px;
+        vertical-align: middle;
+        text-transform: uppercase;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       RISK BADGE
+    ═══════════════════════════════════════════════════════════ */
+    .risk-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 0.80rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }}
+    .risk-high  {{ background:#fde9e5; color:#C0392B; border:1px solid #f5c6c0; }}
+    .risk-medio {{ background:#fef9e7; color:#9A7D0A; border:1px solid #f9e79f; }}
+    .risk-bajo  {{ background:#e9f7ef; color:#1E8449; border:1px solid #a9dfbf; }}
+
+    /* ═══════════════════════════════════════════════════════════
+       ALERT BOX
+    ═══════════════════════════════════════════════════════════ */
+    .alert-box {{
+        border-left: 3px solid {VIKINGS_GOLD};
+        background: #FFFBF0;
+        border-radius: 0 6px 6px 0;
+        padding: 10px 14px;
+        margin: 5px 0;
+        font-size: 0.81rem;
+        line-height: 1.5;
+        color: {VIKINGS_DARK};
+    }}
+    .alert-box.high {{
+        border-color: {DANGER_RED};
+        background: #FEF5F4;
+    }}
+    .alert-box.low {{
+        border-color: {SUCCESS_GREEN};
+        background: #F0FBF5;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       GUIDE / EXPLAINER CARDS
+    ═══════════════════════════════════════════════════════════ */
+    .guide-card {{
+        background: #FFFFFF;
+        border: 1px solid #E8E0F5;
+        border-top: 3px solid {VIKINGS_PURPLE};
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        height: 100%;
+    }}
+    .guide-card h4 {{
+        color: {VIKINGS_PURPLE};
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin: 0 0 7px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }}
+    .guide-card p, .guide-card li {{
+        color: #3D2A5A;
+        font-size: 0.80rem;
+        line-height: 1.6;
+        margin: 0;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       QUALITY THRESHOLD CLASSES
+    ═══════════════════════════════════════════════════════════ */
+    .thresh-excellent {{ color:#1E8449; font-weight:700; }}
+    .thresh-good      {{ color:{VIKINGS_PURPLE}; font-weight:600; }}
+    .thresh-warn      {{ color:#9A7D0A; font-weight:600; }}
+    .thresh-bad       {{ color:#C0392B; font-weight:600; }}
+
+    /* ═══════════════════════════════════════════════════════════
+       CHAT BUBBLES
+    ═══════════════════════════════════════════════════════════ */
+    .chat-user {{
+        background: #F0EBF8;
+        border-radius: 12px 12px 4px 12px;
+        padding: 10px 14px;
+        margin: 8px 50px 8px 0;
+        font-size: 0.85rem;
+        color: {VIKINGS_DARK};
+        line-height: 1.5;
+    }}
+    .chat-assistant {{
+        background: #FFFFFF;
+        border-left: 3px solid {VIKINGS_GOLD};
+        border-radius: 0 10px 10px 10px;
+        padding: 12px 16px;
+        margin: 8px 0 8px 50px;
+        font-size: 0.85rem;
+        color: {VIKINGS_DARK};
+        line-height: 1.6;
+        box-shadow: 0 1px 4px rgba(79,38,131,0.07);
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       TIME FILTER INFO BAR
+    ═══════════════════════════════════════════════════════════ */
+    .time-filter-bar {{
+        background: #F0EBF8;
+        border: 1px solid #DDD5F3;
+        border-radius: 6px;
+        padding: 6px 12px;
+        margin-bottom: 10px;
+        font-size: 0.76rem;
+        color: {VIKINGS_MID};
+        display: inline-block;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       METRIC OVERRIDE
+    ═══════════════════════════════════════════════════════════ */
+    [data-testid="metric-container"] {{
+        background: white;
+        border-radius: 8px;
+        padding: 14px !important;
+        box-shadow: 0 1px 5px rgba(79,38,131,0.07);
+        border: 1px solid #EDE8F8;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       DATA TABLES
+    ═══════════════════════════════════════════════════════════ */
+    [data-testid="stDataFrame"] {{
+        border: 1px solid #E8E0F5;
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+
+    /* ═══════════════════════════════════════════════════════════
+       EXPANDER
+    ═══════════════════════════════════════════════════════════ */
+    [data-testid="stExpander"] {{
+        border: 1px solid #E2D9F3 !important;
+        border-radius: 8px !important;
+    }}
+    [data-testid="stExpander"] summary {{
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: {VIKINGS_PURPLE};
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
-# Component helpers
+# UI component helpers
 # ---------------------------------------------------------------------------
 
 def render_header() -> None:
-    st.markdown(
-        f"""
-        <div class="app-header">
-            <h1>🏈 {APP_TITLE}</h1>
-            <p>{APP_SUBTITLE} &nbsp;|&nbsp; Forecasting · Risk Scoring · Decision Intelligence</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"""
+    <div class="app-header">
+        <h1>Plastic Futures <span class="gold-pill">Decision Hub</span></h1>
+        <p>{APP_SUBTITLE} &nbsp;·&nbsp; Análisis de mercado · Previsión de precios · Soporte a decisiones de compra</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def kpi_card(label: str, value: str, delta: str = "", delta_dir: str = "neu") -> None:
-    delta_html = (
-        f'<div class="kpi-delta {delta_dir}">{delta}</div>'
-        if delta else ""
-    )
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">{label}</div>
-            <div class="kpi-value">{value}</div>
-            {delta_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    delta_html = f'<div class="kpi-delta {delta_dir}">{delta}</div>' if delta else ""
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        {delta_html}
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def section_header(text: str) -> None:
@@ -276,10 +475,12 @@ def section_header(text: str) -> None:
 
 
 def risk_badge(level: str) -> None:
-    css = {"Alto": "risk-high", "Medio": "risk-medio", "Bajo": "risk-bajo"}.get(level, "risk-bajo")
-    icons = {"Alto": "🔴", "Medio": "🟡", "Bajo": "🟢"}
+    css   = {"Alto": "risk-high", "Medio": "risk-medio", "Bajo": "risk-bajo"}.get(level, "risk-bajo")
+    icons = {"Alto": "●", "Medio": "●", "Bajo": "●"}
+    colors= {"Alto": "#C0392B", "Medio": "#9A7D0A", "Bajo": "#1E8449"}
     st.markdown(
-        f'<span class="risk-badge {css}">{icons.get(level, "")} Riesgo {level}</span>',
+        f'<span class="risk-badge {css}">'
+        f'<span style="color:{colors.get(level,"")}">●</span> Riesgo {level}</span>',
         unsafe_allow_html=True,
     )
 
@@ -290,41 +491,33 @@ def alert_box(msg: str, level: str = "medium") -> None:
 
 
 def guide_card(title: str, body: str) -> None:
-    """Render a styled card for the model guide section."""
     st.markdown(
         f'<div class="guide-card"><h4>{title}</h4><p>{body}</p></div>',
         unsafe_allow_html=True,
     )
 
 
-def render_sidebar_brand() -> None:
-    st.markdown(
-        f"""
-        <div style="text-align:center; padding: 16px 0 24px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.15); margin-bottom: 20px;">
-            <div style="font-size:2.2rem;">🏈</div>
-            <div style="font-size:1.1rem; font-weight:800; color:white; margin:4px 0 2px 0;">
-                Plastic Futures
-            </div>
-            <div style="font-size:0.68rem; color:#C9B8F0; letter-spacing:0.08em; text-transform:uppercase;">
-                Decision Hub
-            </div>
-            <div style="margin-top:8px; display:inline-block; background:#FFC62F; color:#2D1154;
-                font-size:0.62rem; font-weight:800; padding:2px 10px; border-radius:10px;
-                letter-spacing:0.06em;">
-                MINNESOTA Vikings EDITION
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def time_filter_info(from_year: int, granularity: str, period_label: str = "") -> None:
-    """Small info bar showing active time filter."""
-    extra = f" · {period_label}" if period_label else ""
+    extra = f" &nbsp;·&nbsp; {period_label}" if period_label and period_label != "Todos" else ""
     st.markdown(
-        f'<div class="time-filter-bar">📅 Mostrando desde <strong>{from_year}</strong>'
-        f' · Granularidad: <strong>{granularity}</strong>{extra}</div>',
+        f'<span class="time-filter-bar">📅 Desde <strong>{from_year}</strong>'
+        f' &nbsp;·&nbsp; <strong>{granularity}</strong>{extra}</span>',
         unsafe_allow_html=True,
     )
+
+
+def render_sidebar_brand() -> None:
+    st.markdown(f"""
+    <div style="background:linear-gradient(115deg,{VIKINGS_PURPLE},{VIKINGS_MID});
+        border-radius:8px; padding:16px 18px 14px; margin-bottom:18px;
+        border:1px solid rgba(255,198,47,0.35);
+        box-shadow:0 2px 12px rgba(0,0,0,0.30);">
+        <div style="font-size:1.3rem; font-weight:800; color:white; letter-spacing:-0.3px;">
+            Plastic Futures
+        </div>
+        <div style="font-size:0.7rem; color:{VIKINGS_GOLD}; letter-spacing:0.08em;
+            text-transform:uppercase; margin-top:4px; font-weight:600;">
+            Decision Hub &nbsp;·&nbsp; Market Intelligence
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

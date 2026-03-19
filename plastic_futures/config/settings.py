@@ -52,7 +52,7 @@ HISTORY_LINE_COLOR  = REPSOL_BLUE       # Purple history line
 # ---------------------------------------------------------------------------
 PAGE_CONFIG = dict(
     page_title="Plastic Futures Decision Hub",
-    page_icon="🏈",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -60,8 +60,8 @@ PAGE_CONFIG = dict(
 APP_TITLE    = "Plastic Futures Decision Hub"
 APP_SUBTITLE = "Compras & Planificación · Market Intelligence"
 
-# Data history starts this year (demo data begins Jan 2022)
-DATA_START_YEAR = 2022
+# Data history starts this year (demo data begins Jan 2015)
+DATA_START_YEAR = 2015
 DATA_END_YEAR   = 2024
 
 # ---------------------------------------------------------------------------

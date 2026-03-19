@@ -88,21 +88,29 @@ def render(data: dict, filters: dict) -> None:
     # Scenario detail table
     # -----------------------------------------------------------------------
     section_header("Tabla de precios por escenario (€/ton)")
+    st.caption("ℹ️ Formato americano: la coma ( , ) es separador de miles. Ejemplo: 1,206 = mil doscientos seis €/t.")
+
     sc_table = {}
     for sc_name, df in sc_dfs.items():
         sc_table[sc_name] = df["price"]
     sc_df_table = pd.DataFrame(sc_table)
     sc_df_table.index = sc_df_table.index.strftime("%b %Y")
 
-    def _color_sc(val):
-        if isinstance(val, float):
-            pct = (val - current_price) / current_price
-            if pct > 0.05:  return "color:#C0392B;"
-            if pct < -0.05: return "color:#00845E;"
+    # Format as integers with thousands separator — no decimals
+    sc_df_fmt = sc_df_table.applymap(lambda v: f"{int(round(v)):,}" if pd.notna(v) else "")
+
+    def _color_sc(val: str) -> str:
+        try:
+            v = float(val.replace(",", ""))
+            pct = (v - current_price) / current_price
+            if pct > 0.05:  return "color:#C0392B; font-weight:600;"
+            if pct < -0.05: return "color:#00845E; font-weight:600;"
+        except Exception:
+            pass
         return ""
 
     st.dataframe(
-        sc_df_table.round(0).style.applymap(_color_sc),
+        sc_df_fmt.style.map(_color_sc),
         use_container_width=True, height=280,
     )
 

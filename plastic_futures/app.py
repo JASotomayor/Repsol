@@ -2,19 +2,18 @@
 Plastic Futures Decision Hub
 Compras & Planificación · Market Intelligence
 
-Entry point. Run with:
+Run with:
     streamlit run app.py
 """
 
 import streamlit as st
 
-# ── Page config must be the very first Streamlit call ──────────────────────
+# Page config must be the very first Streamlit call
 from config.settings import PAGE_CONFIG
 st.set_page_config(**PAGE_CONFIG)
 
-# ── Imports ────────────────────────────────────────────────────────────────
 from config.settings import (
-    PRODUCTS, SUPPLIERS, REGIONS, HORIZONS, SCENARIOS, CHART_TYPES,
+    PRODUCTS, REGIONS, HORIZONS, SCENARIOS, CHART_TYPES,
     DATA_START_YEAR, DATA_END_YEAR,
 )
 from data.demo_data import load_demo_data
@@ -28,55 +27,85 @@ import tabs.drivers        as tab_drivers
 import tabs.seguimiento    as tab_seguimiento
 import tabs.chat_insights  as tab_chat
 
-
-# ── CSS ─────────────────────────────────────────────────────────────────────
+# ── Apply theme ──────────────────────────────────────────────────────────────
 apply_custom_css()
 
-# ── Data loading ─────────────────────────────────────────────────────────────
-with st.spinner("Cargando datos del mercado..."):
+# ── Load data ─────────────────────────────────────────────────────────────────
+with st.spinner("Cargando datos de mercado..."):
     data = load_demo_data()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     render_sidebar_brand()
 
-    st.markdown("### Filtros globales")
+    # ── Selección de producto ────────────────────────────────────────────────
+    st.markdown("##### Producto y mercado")
 
     product = st.selectbox(
-        "Producto",
+        "Producto principal",
         PRODUCTS,
         index=0,
-        help="Polímero principal de análisis",
+        help="Polímero sobre el que se centrará el análisis de previsión y riesgo.",
     )
 
+    region = st.selectbox(
+        "Región de referencia",
+        REGIONS,
+        index=0,
+        help="Mercado geográfico para los precios y previsiones.",
+    )
+
+    # ── Precio actual — justo debajo de producto + región ───────────────────
+    prices_df = data["prices"]
+    sub = prices_df[(prices_df["product"] == product) & (prices_df["region"] == region)]
+    if not sub.empty:
+        s = sub.groupby("date")["market_price"].mean()
+        latest = s.iloc[-1]
+        delta  = (s.iloc[-1] - s.iloc[-2]) / s.iloc[-2] * 100
+        arrow  = "▲" if delta > 0 else "▼"
+        d_color = "#E17055" if delta > 0 else "#00B894"
+        st.markdown(f"""
+        <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,198,47,0.35);
+            border-radius:10px; padding:14px 16px; text-align:center; margin-top:6px;">
+            <div style="font-size:0.63rem; font-weight:700; color:#FFC62F;
+                text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">
+                {product} · {region}</div>
+            <div style="font-size:1.65rem; font-weight:800; color:white; letter-spacing:-0.5px; margin:2px 0;">
+                {latest:,.0f} <span style="font-size:0.9rem; font-weight:500; opacity:0.75;">€/t</span></div>
+            <div style="font-size:0.76rem; font-weight:600; color:{d_color}; margin-top:3px;">
+                {arrow} {abs(delta):.1f}% vs mes anterior</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
     products = st.multiselect(
-        "Productos (comparativa)",
+        "Productos en comparativa",
         PRODUCTS,
         default=PRODUCTS[:4],
-        help="Selecciona los productos a incluir en gráficos comparativos",
+        help="Productos que aparecerán en los gráficos comparativos.",
     )
     if not products:
         products = [product]
 
-    region = st.selectbox(
-        "Región",
-        REGIONS,
-        index=0,
-        help="Mercado geográfico de referencia",
-    )
+    st.divider()
+
+    # ── Horizonte y escenario ────────────────────────────────────────────────
+    st.markdown("##### Previsión")
 
     horizon_label = st.select_slider(
         "Horizonte de previsión",
         options=list(HORIZONS.keys()),
         value="12 meses",
+        help="¿Cuántos meses hacia adelante quieres proyectar?",
     )
     horizon = HORIZONS[horizon_label]
 
     scenario = st.selectbox(
-        "Escenario principal",
+        "Escenario de referencia",
         SCENARIOS,
         index=0,
-        help="Escenario de referencia para el análisis de riesgo",
+        help="Contexto de mercado asumido para el análisis de escenarios.",
     )
 
     chart_type = st.selectbox(
@@ -85,92 +114,29 @@ with st.sidebar:
         index=0,
     )
 
-    # ── Período de análisis ──────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("### Período de análisis")
+    st.divider()
 
-    available_years = list(range(DATA_START_YEAR, DATA_END_YEAR + 1))
-    from_year = st.selectbox(
-        "Desde año",
-        available_years,
-        index=0,
-        help=f"Los datos históricos arrancan en {DATA_START_YEAR}",
-    )
+    st.markdown(f"""
+    <div style="font-size:0.60rem; color:rgba(255,255,255,0.38); text-align:center; line-height:1.7;">
+        Datos demo {DATA_START_YEAR}–{DATA_END_YEAR}<br>
+        Tendencia estacional · Lineal · Predictivo avanzado
+    </div>
+    """, unsafe_allow_html=True)
 
-    granularity = st.radio(
-        "Granularidad",
-        ["Mensual", "Trimestral", "Anual"],
-        horizontal=True,
-        help="Agrupa los datos en la vista histórica",
-    )
 
-    # Quarter filter (only meaningful when Trimestral or Mensual)
-    quarters_opts = ["Todos", "Q1 (Ene–Mar)", "Q2 (Abr–Jun)", "Q3 (Jul–Sep)", "Q4 (Oct–Dic)"]
-    quarter_filter = st.selectbox(
-        "Filtrar trimestre",
-        quarters_opts,
-        index=0,
-        help="Muestra solo los meses de ese trimestre en el histórico",
-    )
-    quarter_months = {
-        "Todos": None,
-        "Q1 (Ene–Mar)": [1, 2, 3],
-        "Q2 (Abr–Jun)": [4, 5, 6],
-        "Q3 (Jul–Sep)": [7, 8, 9],
-        "Q4 (Oct–Dic)": [10, 11, 12],
-    }
-    active_months = quarter_months[quarter_filter]
-
-    st.markdown("---")
-
-    # Quick price snapshot
-    prices_df = data["prices"]
-    sub = prices_df[
-        (prices_df["product"] == product) &
-        (prices_df["region"]  == region)
-    ]
-    if not sub.empty:
-        latest = sub.groupby("date")["market_price"].mean().iloc[-1]
-        prev   = sub.groupby("date")["market_price"].mean().iloc[-2]
-        delta  = (latest - prev) / prev * 100
-        arrow  = "▲" if delta > 0 else "▼"
-        color  = "#E17055" if delta > 0 else "#00B894"
-        st.markdown(
-            f"""<div style="background:rgba(255,255,255,0.08); border-radius:8px;
-                padding:12px; text-align:center;">
-                <div style="font-size:0.68rem; color:#90A4AE; text-transform:uppercase;
-                    letter-spacing:0.05em;">{product} · {region}</div>
-                <div style="font-size:1.6rem; font-weight:800; color:white;">
-                    {latest:,.0f} €/t</div>
-                <div style="font-size:0.8rem; color:{color}; font-weight:600;">
-                    {arrow} {abs(delta):.1f}% MoM</div>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-    st.markdown(
-        "<div style='font-size:0.65rem; color:#C9B8F0; text-align:center;'>"
-        f"Datos demo {DATA_START_YEAR}–{DATA_END_YEAR}<br>"
-        "Modelos: HW + Fourier LR + Random Forest<br>"
-        "v1.0 · Market Intelligence"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-# ── Filters dict (shared across all tabs) ────────────────────────────────────
+# ── Filters dict ─────────────────────────────────────────────────────────────
 filters = {
-    "product":        product,
-    "products":       products,
-    "region":         region,
-    "horizon":        horizon,
-    "scenario":       scenario,
-    "chart_type":     chart_type,
-    # Time period filters
-    "from_year":      from_year,
-    "granularity":    granularity,
-    "active_months":  active_months,   # None = all, or list[int] for a quarter
-    "quarter_label":  quarter_filter,
+    "product":       product,
+    "products":      products,
+    "region":        region,
+    "horizon":       horizon,
+    "scenario":      scenario,
+    "chart_type":    chart_type,
+    # Time filters now live inline in each chart; defaults provided for fallback
+    "from_year":     DATA_START_YEAR,
+    "granularity":   "Mensual",
+    "active_months": None,
+    "quarter_label": "Todos",
 }
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -178,32 +144,26 @@ render_header()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "📊 Overview",
-    "📈 Proyecciones",
-    "⚠️ Riesgo de decisión",
-    "🔮 Escenarios",
-    "🔍 Drivers",
-    "📋 Seguimiento",
-    "💬 Chat / Guía del modelo",
+    "Visión general",
+    "Proyecciones",
+    "Riesgo de decisión",
+    "Escenarios",
+    "Factores de mercado",
+    "Seguimiento",
+    "Análisis e insights",
 ])
 
 with tab1:
     tab_overview.render(data, filters)
-
 with tab2:
     tab_proyecciones.render(data, filters)
-
 with tab3:
     tab_riesgo.render(data, filters)
-
 with tab4:
     tab_escenarios.render(data, filters)
-
 with tab5:
     tab_drivers.render(data, filters)
-
 with tab6:
     tab_seguimiento.render(data, filters)
-
 with tab7:
     tab_chat.render(data, filters)

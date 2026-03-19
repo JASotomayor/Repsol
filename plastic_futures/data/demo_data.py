@@ -1,7 +1,7 @@
 """
 Synthetic demo data generator for Plastic Futures Decision Hub.
 
-Produces realistic plastic-market time series (2022-2024 history)
+Produces realistic plastic-market time series (2015-2024 history)
 with trends, seasonality, correlated drivers, and supplier/region layers.
 All prices in EUR/ton; volumes in tons/month.
 """
@@ -81,8 +81,8 @@ def load_demo_data() -> dict[str, pd.DataFrame]:
     """
     rng = np.random.default_rng(42)
 
-    # 36 months history: Jan 2022 – Dec 2024
-    hist_dates = pd.date_range("2022-01-01", periods=36, freq="MS")
+    # 120 months history: Jan 2015 – Dec 2024
+    hist_dates = pd.date_range("2015-01-01", periods=120, freq="MS")
 
     # -----------------------------------------------------------------------
     # 1. Market drivers (common across products)
@@ -90,45 +90,74 @@ def load_demo_data() -> dict[str, pd.DataFrame]:
     n = len(hist_dates)
     t = np.arange(n)
 
-    # Oil price: high in 2022 (energy crisis), then declining, partial recovery
-    oil_shock = np.where(t < 12, 20, 0) + np.where((t >= 12) & (t < 18), -5, 0)
+    # t=0  → Jan 2015
+    # t=60 → Jan 2020 (COVID crash)
+    # t=84 → Jan 2022 (Ukraine / energy crisis)
+
+    # Oil price: realistic cycle 2015-2024
+    #   2015-2016: low (oversupply, ~50 USD)
+    #   2017-2019: recovery to ~65
+    #   2020 Q2: crash to ~25 (COVID)
+    #   2021: recovery
+    #   2022: spike >100 (Ukraine)
+    #   2023-2024: normalisation ~80
+    oil_base_path = np.interp(
+        t,
+        [0,  12, 24, 36, 48, 54, 60, 63, 72, 84, 90, 96, 108, 119],
+        [55, 48, 52, 62, 68, 65, 35, 28, 70, 105, 90, 82, 78,  80],
+    )
     oil = (
-        _OIL_BASE_USD
-        + oil_shock
-        + 8 * np.sin(2 * np.pi * t / 12)
+        oil_base_path
+        + 6 * np.sin(2 * np.pi * t / 12)
         + rng.normal(0, 3, n)
     )
-    oil = np.clip(oil, 55, 140).astype(float)
+    oil = np.clip(oil, 20, 140).astype(float)
 
+    # EUR/USD: ~1.10 in 2015, weakening to 1.05 in 2022, partial recovery
+    eur_usd_path = np.interp(
+        t,
+        [0,   24,  48,  72,  84,  96, 108, 119],
+        [1.12, 1.10, 1.12, 1.08, 1.00, 1.03, 1.07, 1.06],
+    )
     eur_usd = (
-        _EURUSD_BASE
-        - 0.004 * t
-        + 0.03 * np.sin(2 * np.pi * t / 12 + 1)
-        + rng.normal(0, 0.01, n)
+        eur_usd_path
+        + 0.025 * np.sin(2 * np.pi * t / 12 + 1)
+        + rng.normal(0, 0.008, n)
     )
     eur_usd = np.clip(eur_usd, 0.95, 1.25).astype(float)
 
-    pmi = (
-        _PMI_BASE
-        + 3 * np.sin(2 * np.pi * t / 12)
-        + rng.normal(0, 1.5, n)
+    # PMI: stable 50-54, dip in 2020, bounce 2021
+    pmi_path = np.interp(
+        t,
+        [0,  48, 60, 63, 72, 84, 96, 119],
+        [52, 53, 42, 44, 56, 52, 50,  51],
     )
-    pmi = np.clip(pmi, 44, 60).astype(float)
+    pmi = (
+        pmi_path
+        + 2.5 * np.sin(2 * np.pi * t / 12)
+        + rng.normal(0, 1.2, n)
+    )
+    pmi = np.clip(pmi, 38, 62).astype(float)
 
     demand_idx = (
         _DEMAND_BASE
-        + 0.3 * t
+        + 0.25 * t
         + 8 * np.sin(2 * np.pi * t / 12 - 0.5)
+        - 25 * np.exp(-((t - 61) ** 2) / 8)   # COVID trough
         + rng.normal(0, 4, n)
     )
 
+    # Gas EU: low until 2021, spike 2022, gradual decline
+    gas_path = np.interp(
+        t,
+        [0,  60, 72, 80, 84, 87, 96, 108, 119],
+        [22, 20, 28, 35, 80, 130, 65, 40,  35],
+    )
     gas_price_eu = (
-        35
-        + 40 * np.exp(-0.15 * t) * (t < 12)
-        + 15 * np.exp(-0.05 * (t - 12)) * (t >= 12)
+        gas_path
         + rng.normal(0, 4, n)
     )
-    gas_price_eu = np.clip(gas_price_eu, 15, 120).astype(float)
+    gas_price_eu = np.clip(gas_price_eu, 12, 160).astype(float)
 
     market_df = pd.DataFrame({
         "date":         hist_dates,
@@ -213,6 +242,20 @@ def load_demo_data() -> dict[str, pd.DataFrame]:
     # 4. Alerts / events table (notable market events in the data)
     # -----------------------------------------------------------------------
     alerts_df = pd.DataFrame([
+        {"date": "2015-06-01", "event": "Caída precio petróleo → reducción costes feedstock",
+         "impact": "Medio", "products": "Todos"},
+        {"date": "2016-02-01", "event": "Mínimo histórico Brent (~27 USD) → precios plásticos bajos",
+         "impact": "Alto", "products": "HDPE,LDPE,PP,PS"},
+        {"date": "2017-09-01", "event": "Huracán Harvey → parada plantas petroquímicas EE.UU.",
+         "impact": "Alto", "products": "HDPE,PP,PET"},
+        {"date": "2018-10-01", "event": "Tensiones comerciales EE.UU.-China → volatilidad demanda",
+         "impact": "Medio", "products": "Todos"},
+        {"date": "2020-04-01", "event": "COVID-19: colapso demanda industrial global",
+         "impact": "Alto", "products": "Todos"},
+        {"date": "2021-03-01", "event": "Tormenta Uri Texas → parada petroquímica → escasez",
+         "impact": "Alto", "products": "HDPE,LDPE,PP,PVC"},
+        {"date": "2021-07-01", "event": "Cuellos de botella logísticos post-COVID → precios récord",
+         "impact": "Alto", "products": "Todos"},
         {"date": "2022-03-01", "event": "Inicio conflicto Ucrania → subida gas y feedstock",
          "impact": "Alto", "products": "HDPE,LDPE,PP,PS"},
         {"date": "2022-07-01", "event": "Máximo precio gas europeo en verano 2022",

@@ -9,10 +9,13 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from utils.styling import kpi_card, section_header, alert_box, time_filter_info
+from utils.styling import kpi_card, section_header, alert_box
 from utils.charts import multi_product_lines, heatmap_chart, apply_time_filter
 from models.risk_scoring import build_risk_heatmap
-from config.settings import REPSOL_ORANGE, REPSOL_BLUE, SUCCESS_GREEN, DANGER_RED, WARNING_AMBER
+from config.settings import (
+    REPSOL_ORANGE, REPSOL_BLUE, SUCCESS_GREEN, DANGER_RED, WARNING_AMBER,
+    DATA_START_YEAR, DATA_END_YEAR,
+)
 
 
 def render(data: dict, filters: dict) -> None:
@@ -99,37 +102,81 @@ def render(data: dict, filters: dict) -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # -----------------------------------------------------------------------
-    # Main charts row
+    # Historical price chart — full width with inline time filters
     # -----------------------------------------------------------------------
-    col_left, col_right = st.columns([3, 2])
+    section_header("Histórico de precios por producto")
 
-    with col_left:
-        section_header("Histórico de precios por producto")
-        time_filter_info(from_year, granularity, quarter_label if quarter_label != "Todos" else "")
-        fig = multi_product_lines(
-            prices_df, products, region,
-            from_year=from_year, granularity=granularity, active_months=active_months,
+    # Inline compact filter row
+    _year_opts = list(range(DATA_START_YEAR, DATA_END_YEAR + 1))
+    _gran_opts  = ["Mensual", "Trimestral", "Anual"]
+    _qtr_opts   = ["Todos", "T1 (Ene–Mar)", "T2 (Abr–Jun)", "T3 (Jul–Sep)", "T4 (Oct–Dic)"]
+    _qtr_months = {
+        "T1 (Ene–Mar)": [1, 2, 3], "T2 (Abr–Jun)": [4, 5, 6],
+        "T3 (Jul–Sep)": [7, 8, 9], "T4 (Oct–Dic)": [10, 11, 12],
+    }
+
+    fi1, fi2, fi3, _fpad = st.columns([1, 1.2, 1.4, 3])
+    with fi1:
+        ov_year = st.selectbox(
+            "📅 Desde", _year_opts,
+            index=_year_opts.index(from_year) if from_year in _year_opts else 0,
+            key="ov_from_year",
         )
-        st.plotly_chart(fig, use_container_width=True)
+    with fi2:
+        ov_gran = st.selectbox(
+            "📊 Granularidad", _gran_opts,
+            index=_gran_opts.index(granularity) if granularity in _gran_opts else 0,
+            key="ov_granularity",
+        )
+    with fi3:
+        ov_qtr_label = st.selectbox(
+            "🗓 Trimestre", _qtr_opts,
+            key="ov_quarter",
+        )
+    ov_active_months = _qtr_months.get(ov_qtr_label)
 
-    with col_right:
-        section_header("Mapa de riesgo por producto")
-        risk_hm = build_risk_heatmap(data, region, products)
-        # Drop NaN columns
-        risk_hm = risk_hm.dropna(axis=1, how="all").fillna(0)
-        if not risk_hm.empty:
-            fig_hm = heatmap_chart(
-                risk_hm,
-                title="",
-                colorscale=[
-                    [0.0,  "#E8F8F5"],
-                    [0.33, "#FFF3CD"],
-                    [0.66, "#FFE0D0"],
-                    [1.0,  "#E74C3C"],
-                ],
-                zmin=0, zmax=100,
-            )
-            st.plotly_chart(fig_hm, use_container_width=True)
+    fig = multi_product_lines(
+        prices_df, products, region,
+        title="",
+        from_year=ov_year, granularity=ov_gran, active_months=ov_active_months,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # -----------------------------------------------------------------------
+    # Risk heatmap — below price chart, with explanation expander
+    # -----------------------------------------------------------------------
+    section_header("Mapa de riesgo por producto")
+
+    with st.expander("¿Qué muestra este mapa?", expanded=False):
+        st.markdown("""
+        El **mapa de riesgo** muestra la volatilidad de precio de cada producto mes a mes,
+        expresada como un índice de **0 a 100**:
+
+        - 🟢 **Verde (0–33):** mercado estable, baja incertidumbre de precio.
+        - 🟡 **Amarillo (34–66):** variabilidad moderada, conviene seguimiento activo.
+        - 🔴 **Rojo (67–100):** alta volatilidad o tendencia alcista marcada; mayor riesgo en la decisión de compra.
+
+        El índice combina la **variación de precio en el mes** respecto a la media móvil
+        y la **volatilidad acumulada** de los últimos 3 meses.
+        Úsalo para identificar de un vistazo qué productos han tenido períodos de mayor riesgo
+        y si ese patrón se repite estacionalmente.
+        """)
+
+    risk_hm = build_risk_heatmap(data, region, products)
+    risk_hm = risk_hm.dropna(axis=1, how="all").fillna(0)
+    if not risk_hm.empty:
+        fig_hm = heatmap_chart(
+            risk_hm,
+            title="",
+            colorscale=[
+                [0.00, "#1A9850"],   # verde saturado  — riesgo bajo
+                [0.33, "#FEE08B"],   # amarillo claro  — transición
+                [0.55, "#F46D43"],   # naranja          — riesgo moderado-alto
+                [1.00, "#A50026"],   # rojo oscuro      — riesgo alto
+            ],
+            zmin=0, zmax=100,
+        )
+        st.plotly_chart(fig_hm, use_container_width=True)
 
     # -----------------------------------------------------------------------
     # Market drivers mini strip

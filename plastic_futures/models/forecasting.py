@@ -359,7 +359,21 @@ class PlasticForecastEngine:
         return {k: round(v, 4) for k, v in self._weights.items()}
 
     def feature_importances(self) -> dict[str, float]:
-        return self._rf.feature_importances()
+        raw = self._rf.feature_importances()
+        _friendly = {
+            "lag_1":  "Precio mes anterior",
+            "lag_2":  "Precio hace 2 meses",
+            "lag_3":  "Precio hace 3 meses",
+            "lag_6":  "Precio hace 6 meses",
+            "lag_12": "Precio hace 12 meses",
+            "t":      "Tendencia general",
+            "t2":     "Tendencia acelerada",
+            "sin1":   "Estacionalidad (ciclo A)",
+            "cos1":   "Estacionalidad (ciclo B)",
+            "sin2":   "Estacionalidad (ciclo C)",
+            "cos2":   "Estacionalidad (ciclo D)",
+        }
+        return {_friendly.get(k, k): v for k, v in raw.items()}
 
     @property
     def history_dates(self) -> pd.DatetimeIndex:

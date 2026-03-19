@@ -1,24 +1,20 @@
 """
 Tab 6 – Seguimiento del modelo
-Backtest accuracy, model confidence scores, supplier price table, alerts.
+Precisión histórica, tabla de proveedores, alertas de mercado.
 """
 
 from __future__ import annotations
-import pandas as pd
-import numpy as np
 import streamlit as st
-import plotly.graph_objects as go
 
 from utils.styling import section_header, kpi_card, alert_box
 from utils.charts import backtest_chart
 from models.forecasting import PlasticForecastEngine
 from data.demo_data import get_product_series
-from config.settings import PRODUCTS, REPSOL_ORANGE, REPSOL_BLUE, SUCCESS_GREEN, DANGER_RED, WARNING_AMBER, IVORY
+from config.settings import PRODUCTS, SUCCESS_GREEN, DANGER_RED
 
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_all_backtests(region: str):
-    """Backtest all products and return summary table."""
     from data.demo_data import load_demo_data
     data = load_demo_data()
     rows = []
@@ -31,80 +27,83 @@ def _get_all_backtests(region: str):
         bt = engine.backtest()
         w  = engine.model_weights()
         rows.append({
-            "Producto":         product,
-            "MAPE Ensemble %":  round(bt["mape_ens"].mean(), 2),
-            "MAPE HW %":        round(bt["mape_hw"].mean(), 2),
-            "MAPE RF %":        round(bt["mape_rf"].mean(), 2),
-            "RMSE (€/t)":       round(bt["rmse_ens"].mean(), 1),
-            "Confianza %":      round(bt["confidence"].mean(), 1),
-            "Peso HW":          f"{w.get('hw', 0)*100:.0f}%",
-            "Peso LF":          f"{w.get('lf', 0)*100:.0f}%",
-            "Peso RF":          f"{w.get('rf', 0)*100:.0f}%",
+            "Producto":             product,
+            "Error de previsión %": round(bt["mape_ens"].mean(), 2),
+            "Error HW %":           round(bt["mape_hw"].mean(), 2),
+            "Error RF %":           round(bt["mape_rf"].mean(), 2),
+            "Desv. típica (€/t)":   round(bt["rmse_ens"].mean(), 1),
+            "Fiabilidad %":         round(bt["confidence"].mean(), 1),
+            "Peso tend. estacional": f"{w.get('hw', 0)*100:.0f}%",
+            "Peso lineal":           f"{w.get('lf', 0)*100:.0f}%",
+            "Peso predictivo":       f"{w.get('rf', 0)*100:.0f}%",
         })
-    return pd.DataFrame(rows), {p: None for p in PRODUCTS}
+    return pd.DataFrame(rows)
+
+
+import pandas as pd
 
 
 def render(data: dict, filters: dict) -> None:
     product = filters["product"]
     region  = filters["region"]
 
-    section_header(f"Seguimiento del Modelo · Región: {region}")
+    section_header(f"Seguimiento del modelo · Región: {region}")
 
     with st.spinner("Calculando métricas de todos los productos..."):
-        summary_df, _ = _get_all_backtests(region)
+        summary_df = _get_all_backtests(region)
 
-    # -----------------------------------------------------------------------
-    # Global summary KPIs
-    # -----------------------------------------------------------------------
-    avg_mape  = summary_df["MAPE Ensemble %"].mean()
-    best_prod = summary_df.loc[summary_df["MAPE Ensemble %"].idxmin(), "Producto"]
-    worst_prod = summary_df.loc[summary_df["MAPE Ensemble %"].idxmax(), "Producto"]
-    avg_conf  = summary_df["Confianza %"].mean()
+    # ── KPIs globales ────────────────────────────────────────────────────────
+    avg_err   = summary_df["Error de previsión %"].mean()
+    best_prod = summary_df.loc[summary_df["Error de previsión %"].idxmin(), "Producto"]
+    worst_prod= summary_df.loc[summary_df["Error de previsión %"].idxmax(), "Producto"]
+    avg_conf  = summary_df["Fiabilidad %"].mean()
 
     c1, c2, c3, c4 = st.columns(4)
-    with c1: kpi_card("MAPE medio ensemble", f"{avg_mape:.1f}%",
-                       delta="Media todos productos", delta_dir="pos" if avg_mape < 4 else "neg")
-    with c2: kpi_card("Mejor producto", best_prod,
-                       delta=f"MAPE: {summary_df[summary_df['Producto']==best_prod]['MAPE Ensemble %'].iloc[0]:.1f}%",
-                       delta_dir="pos")
-    with c3: kpi_card("Producto + difícil", worst_prod,
-                       delta=f"MAPE: {summary_df[summary_df['Producto']==worst_prod]['MAPE Ensemble %'].iloc[0]:.1f}%",
-                       delta_dir="neg")
-    with c4: kpi_card("Confianza media", f"{avg_conf:.0f}%", delta_dir="pos" if avg_conf > 70 else "neu")
+    with c1:
+        kpi_card("Error medio de previsión", f"{avg_err:.1f}%",
+                 delta="Promedio de todos los productos",
+                 delta_dir="pos" if avg_err < 4 else "neg")
+    with c2:
+        kpi_card("Producto más predecible", best_prod,
+                 delta=f"Error: {summary_df[summary_df['Producto']==best_prod]['Error de previsión %'].iloc[0]:.1f}%",
+                 delta_dir="pos")
+    with c3:
+        kpi_card("Producto más volátil", worst_prod,
+                 delta=f"Error: {summary_df[summary_df['Producto']==worst_prod]['Error de previsión %'].iloc[0]:.1f}%",
+                 delta_dir="neg")
+    with c4:
+        kpi_card("Fiabilidad media", f"{avg_conf:.0f}%",
+                 delta_dir="pos" if avg_conf > 70 else "neu")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # -----------------------------------------------------------------------
-    # Summary accuracy table (all products)
-    # -----------------------------------------------------------------------
-    section_header("Tabla de precisión por producto")
+    # ── Tabla de precisión ───────────────────────────────────────────────────
+    section_header("Precisión por producto")
 
-    def _mape_color(val):
+    def _err_color(val):
         if isinstance(val, float):
-            if val < 3:   return "background-color:#EBF9F4; color:#00845E; font-weight:700;"
-            if val < 7:   return "background-color:#FFF8E1; color:#B7860B;"
+            if val < 3:   return "background-color:#E9F7EF; color:#1E8449; font-weight:700;"
+            if val < 7:   return "background-color:#FEFAE6; color:#9A7D0A;"
             return "background-color:#FEF0ED; color:#C0392B;"
         return ""
 
     def _conf_color(val):
         if isinstance(val, float):
-            if val >= 80: return "color:#00845E; font-weight:700;"
-            if val >= 60: return "color:#B7860B;"
+            if val >= 80: return "color:#1E8449; font-weight:700;"
+            if val >= 60: return "color:#9A7D0A;"
             return "color:#C0392B;"
         return ""
 
     st.dataframe(
         summary_df.style
-        .applymap(_mape_color, subset=["MAPE Ensemble %", "MAPE HW %", "MAPE RF %"])
-        .applymap(_conf_color, subset=["Confianza %"]),
-        use_container_width=True, height=280,
+            .map(_err_color, subset=["Error de previsión %", "Error HW %", "Error RF %"])
+            .map(_conf_color, subset=["Fiabilidad %"]),
+        use_container_width=True, height=260,
     )
 
-    # -----------------------------------------------------------------------
-    # Selected product backtest detail
-    # -----------------------------------------------------------------------
+    # ── Detalle del producto seleccionado ────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
-    section_header(f"Detalle backtest: {product}")
+    section_header(f"Validación detallada: {product}")
 
     from data.demo_data import load_demo_data
     _data = load_demo_data()
@@ -113,20 +112,30 @@ def render(data: dict, filters: dict) -> None:
     engine.fit(series)
     bt_detail = engine.backtest()
 
-    fig_bt = backtest_chart(bt_detail, title=f"Walk-forward validation – {product}")
+    fig_bt = backtest_chart(bt_detail, title=f"Validación histórica — {product}")
     st.plotly_chart(fig_bt, use_container_width=True)
 
-    col_bt1, col_bt2 = st.columns(2)
+    col_bt1, col_bt2 = st.columns(2, gap="large")
     with col_bt1:
-        section_header("Métricas por fold")
-        display_bt = bt_detail[["fold", "date_start", "mape_ens", "mape_hw", "mape_lf", "mape_rf", "rmse_ens", "confidence"]].copy()
+        section_header("Resultados por período de validación")
+        display_bt = bt_detail[[
+            "fold", "date_start",
+            "mape_ens", "mape_hw", "mape_lf", "mape_rf",
+            "rmse_ens", "confidence"
+        ]].copy()
         display_bt["date_start"] = display_bt["date_start"].dt.strftime("%b %Y")
-        display_bt.columns = ["Fold", "Inicio", "MAPE Ens%", "MAPE HW%", "MAPE LF%", "MAPE RF%", "RMSE", "Conf%"]
-        st.dataframe(display_bt.style.applymap(_mape_color, subset=["MAPE Ens%", "MAPE HW%", "MAPE RF%"]),
-                     use_container_width=True)
+        display_bt.columns = [
+            "Período", "Inicio", "Error total %",
+            "Error estacional %", "Error lineal %", "Error predictivo %",
+            "Desv. típica", "Fiabilidad %",
+        ]
+        st.dataframe(
+            display_bt.style.map(_err_color, subset=["Error total %"]),
+            use_container_width=True,
+        )
 
     with col_bt2:
-        section_header("Pesos del ensemble por producto")
+        section_header("Pesos del modelo por producto")
         weight_rows = []
         for p in PRODUCTS:
             s = get_product_series(_data, p, region)
@@ -135,14 +144,16 @@ def render(data: dict, filters: dict) -> None:
             eng = PlasticForecastEngine()
             eng.fit(s)
             w = eng.model_weights()
-            weight_rows.append({"Producto": p, "HW": f"{w.get('hw',0)*100:.0f}%",
-                                  "LF": f"{w.get('lf',0)*100:.0f}%", "RF": f"{w.get('rf',0)*100:.0f}%"})
+            weight_rows.append({
+                "Producto": p,
+                "Tendencia estacional": f"{w.get('hw',0)*100:.0f}%",
+                "Modelo lineal":        f"{w.get('lf',0)*100:.0f}%",
+                "Modelo predictivo":    f"{w.get('rf',0)*100:.0f}%",
+            })
         if weight_rows:
             st.dataframe(pd.DataFrame(weight_rows), use_container_width=True)
 
-    # -----------------------------------------------------------------------
-    # Supplier price table
-    # -----------------------------------------------------------------------
+    # ── Tabla de proveedores ─────────────────────────────────────────────────
     section_header("Precios actuales por proveedor")
     prices_df = data["prices"]
     last_date = prices_df["date"].max()
@@ -151,24 +162,32 @@ def render(data: dict, filters: dict) -> None:
         (prices_df["region"]  == region) &
         (prices_df["date"]    == last_date)
     ][["supplier", "price", "volume"]].copy()
-    sup_prices = sup_prices.merge(data["suppliers"][["supplier", "lead_time_days", "rating", "sustainability_score"]],
-                                   on="supplier", how="left")
-    sup_prices = sup_prices.sort_values("price")
-    sup_prices.columns = ["Proveedor", "Precio (€/t)", "Volumen (t)", "Lead time (días)", "Rating", "Sostenibilidad"]
+    sup_prices = sup_prices.merge(
+        data["suppliers"][["supplier", "lead_time_days", "rating", "sustainability_score"]],
+        on="supplier", how="left"
+    ).sort_values("price")
+    sup_prices.columns = [
+        "Proveedor", "Precio (€/t)", "Volumen (t)",
+        "Plazo entrega (días)", "Valoración", "Puntuación sostenibilidad",
+    ]
+
+    best_price  = sup_prices["Precio (€/t)"].min()
+    worst_price = sup_prices["Precio (€/t)"].max()
 
     def _price_bar(val):
-        return f"color:{DANGER_RED};" if isinstance(val, float) and val == sup_prices["Precio (€/t)"].max() else (
-            f"color:{SUCCESS_GREEN}; font-weight:700;" if isinstance(val, float) and val == sup_prices["Precio (€/t)"].min() else "")
+        if isinstance(val, float):
+            if val == best_price:  return f"color:{SUCCESS_GREEN}; font-weight:700;"
+            if val == worst_price: return f"color:{DANGER_RED};"
+        return ""
 
     st.dataframe(
-        sup_prices.style.applymap(_price_bar, subset=["Precio (€/t)"]),
+        sup_prices.style.map(_price_bar, subset=["Precio (€/t)"]),
         use_container_width=True,
     )
 
-    # -----------------------------------------------------------------------
-    # Monitoring alerts
-    # -----------------------------------------------------------------------
-    section_header("Alertas de seguimiento")
+    # ── Alertas de vigilancia ────────────────────────────────────────────────
+    section_header("Señales de alerta por producto")
+    alert_found = False
     for p in PRODUCTS:
         s = get_product_series(_data, p, region)
         if s.empty:
@@ -176,8 +195,15 @@ def render(data: dict, filters: dict) -> None:
         mom = (s.iloc[-1] - s.iloc[-4]) / s.iloc[-4] * 100
         vol = s.rolling(3).std().iloc[-1] / s.mean() * 100
         if abs(mom) > 8:
-            alert_box(f"<strong>{p}</strong>: Movimiento brusco {mom:+.1f}% en 3 meses",
-                      level="high" if abs(mom) > 12 else "medium")
+            alert_box(
+                f"<strong>{p}</strong>: variación de {mom:+.1f}% en los últimos 3 meses.",
+                level="high" if abs(mom) > 12 else "medium",
+            )
+            alert_found = True
         if vol > 6:
-            alert_box(f"<strong>{p}</strong>: Volatilidad elevada ({vol:.1f}% CV-3M)",
-                      level="medium")
+            alert_box(
+                f"<strong>{p}</strong>: volatilidad elevada ({vol:.1f}%) en los últimos 3 meses.",
+            )
+            alert_found = True
+    if not alert_found:
+        alert_box("No hay señales de alerta activas en este momento.", level="low")
