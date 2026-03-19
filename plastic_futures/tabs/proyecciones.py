@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-from utils.styling import section_header, kpi_card
+from utils.styling import section_header, kpi_card, time_filter_info
 from utils.charts import fan_chart, backtest_chart, feature_importance_chart
 from models.forecasting import PlasticForecastEngine
 from data.demo_data import get_product_series
@@ -31,10 +31,14 @@ def _fit_and_forecast(product: str, region: str, horizon: int, _data_hash: str):
 
 
 def render(data: dict, filters: dict) -> None:
-    product  = filters["product"]
-    region   = filters["region"]
-    horizon  = filters["horizon"]
-    chart_tp = filters["chart_type"]
+    product       = filters["product"]
+    region        = filters["region"]
+    horizon       = filters["horizon"]
+    chart_tp      = filters["chart_type"]
+    from_year     = filters.get("from_year", 2022)
+    granularity   = filters.get("granularity", "Mensual")
+    active_months = filters.get("active_months")
+    quarter_label = filters.get("quarter_label", "Todos")
 
     # Use a simple hash so caching works
     data_hash = f"{product}_{region}_{horizon}"
@@ -81,10 +85,12 @@ def render(data: dict, filters: dict) -> None:
     # -----------------------------------------------------------------------
     col_main, col_side = st.columns([3, 1])
     with col_main:
-        if chart_tp in ("Fan Chart", "Líneas", "Área"):
-            fig = fan_chart(series, forecast, title=f"Previsión fan chart — {product} ({region})")
-        else:
-            fig = fan_chart(series, forecast, title=f"Previsión fan chart — {product} ({region})")
+        time_filter_info(from_year, granularity, quarter_label if quarter_label != "Todos" else "")
+        fig = fan_chart(
+            series, forecast,
+            title=f"Previsión fan chart — {product} ({region})",
+            from_year=from_year, granularity=granularity, active_months=active_months,
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with col_side:

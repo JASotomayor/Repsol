@@ -10,12 +10,13 @@ import json
 import pandas as pd
 import streamlit as st
 
-from utils.styling import section_header, alert_box
+from utils.styling import section_header, alert_box, guide_card
+from utils.charts import backtest_chart
 from models.forecasting import PlasticForecastEngine
 from models.risk_scoring import compute_risk_score
 from models.scenarios import build_scenario_forecasts
 from data.demo_data import get_product_series
-from config.settings import LLM_MODEL, LLM_MAX_TOKENS
+from config.settings import LLM_MODEL, LLM_MAX_TOKENS, VIKINGS_PURPLE, VIKINGS_GOLD
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +224,269 @@ def render(data: dict, filters: dict) -> None:
                         file_name=f"insights_{product}_{region}.txt",
                         mime="text/plain",
                     )
+
+    # -----------------------------------------------------------------------
+    # Model Guide section (always visible below chat)
+    # -----------------------------------------------------------------------
+    st.markdown("<br>", unsafe_allow_html=True)
+    _render_model_guide(data, product, region, ctx)
+
+
+# ---------------------------------------------------------------------------
+# Model guide section
+# ---------------------------------------------------------------------------
+
+def _render_model_guide(data: dict, product: str, region: str, ctx: dict) -> None:
+    """
+    Full explainer: architecture, quality thresholds, how to read each metric.
+    Optionally uses the LLM for a plain-language synthesis.
+    """
+    st.markdown(
+        f"""<div style="background:linear-gradient(90deg,{VIKINGS_PURPLE},#7B5EA7);
+            border-radius:10px; padding:14px 20px; margin:0 0 16px 0; color:white;">
+            <span style="font-size:1.1rem; font-weight:800;">📖 Guía del Modelo</span>
+            <span style="font-size:0.82rem; opacity:0.88; margin-left:12px;">
+                ¿Qué hace cada componente? · ¿Cuándo es una buena predicción?
+            </span>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    # ---- tabs inside the guide ----
+    g1, g2, g3, g4 = st.tabs([
+        "🏗️ Arquitectura", "📏 Umbrales de calidad", "📊 Cómo leer los gráficos", "🤖 Síntesis con IA"
+    ])
+
+    # ---- Tab G1: Architecture ----
+    with g1:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            guide_card(
+                "Holt-Winters (HW)",
+                "Suavizado exponencial triple con componentes de <b>nivel</b>, <b>tendencia</b> "
+                "y <b>estacionalidad</b> aditiva (período 12 meses). Ideal para capturar "
+                "ciclos estacionales de demanda. Peso dinámico basado en MAPE holdout."
+            )
+            guide_card(
+                "Datos de entrada",
+                f"Serie mensual de precios de mercado: <b>{product}</b> en <b>{region}</b>. "
+                f"Histórico desde 2022 (36 meses). Los modelos se re-ajustan en cada sesión "
+                f"para reflejar el estado más reciente del mercado."
+            )
+        with col2:
+            guide_card(
+                "Regresión Fourier (LF)",
+                "Regresión lineal con pares seno/coseno (<b>2 armónicos</b>) como "
+                "features de estacionalidad, más tendencia lineal y cuadrática. "
+                "Baseline parsimonioso y estable. Resiste mejor que HW si la "
+                "estacionalidad es irregular."
+            )
+            guide_card(
+                "Ensemble ponderado",
+                "Los tres modelos se combinan con pesos <b>inversamente proporcionales "
+                "a su MAPE</b> en un holdout de los últimos 6 meses: el modelo con "
+                "menos error aporta más a la predicción final. Los pesos son específicos "
+                "por producto y región."
+            )
+        with col3:
+            guide_card(
+                "Random Forest (RF)",
+                "200 árboles con <b>features de lag</b> (1, 2, 3, 6, 12 meses) + "
+                "Fourier + tendencia. Captura patrones no lineales y relaciones "
+                "de largo plazo. Peso adaptativo según su rendimiento en validación."
+            )
+            guide_card(
+                "Intervalos de confianza",
+                "<b>Bootstrap de residuos heterocedástico:</b> se remuestrean los "
+                "errores históricos de los tres modelos y se proyectan al futuro "
+                "aplicando una escala que crece con el horizonte (√h). "
+                "El resultado son bandas del 50%, 80% y 95%."
+            )
+
+    # ---- Tab G2: Quality thresholds ----
+    with g2:
+        st.markdown("### ¿Cuándo es una buena predicción?")
+        st.markdown(
+            """
+            <style>
+            .thresh-table th { background:#4F2683; color:white; padding:8px 12px; }
+            .thresh-table td { padding:7px 12px; border-bottom:1px solid #EDE5FF; }
+            .thresh-table tr:hover td { background:#F5F0FF; }
+            </style>
+            """, unsafe_allow_html=True
+        )
+
+        # Build threshold table using actual model metrics when available
+        mape_val  = ctx.get("mape_backtest_pct", None)
+        conf_val  = ctx.get("modelo_confianza_pct", None)
+        risk_val  = ctx.get("riesgo_composite", None)
+        unc_range = ctx.get("incertidumbre_rango_eur_t", None)
+        price_now = ctx.get("precio_actual_eur_t", 1)
+
+        def _thresh_class(val, thresholds):
+            """thresholds = (excellent, good, warn) — lower is better unless inverted."""
+            excellent, good, warn = thresholds
+            if val <= excellent: return "thresh-excellent", "Excelente ✅"
+            if val <= good:      return "thresh-good",      "Bueno 🟦"
+            if val <= warn:      return "thresh-warn",      "Aceptable 🟡"
+            return "thresh-bad", "Mejorable 🔴"
+
+        def _thresh_class_inv(val, thresholds):
+            """Higher is better (e.g. confidence)."""
+            excellent, good, warn = thresholds
+            if val >= excellent: return "thresh-excellent", "Excelente ✅"
+            if val >= good:      return "thresh-good",      "Bueno 🟦"
+            if val >= warn:      return "thresh-warn",      "Aceptable 🟡"
+            return "thresh-bad", "Mejorable 🔴"
+
+        rows = [
+            ("MAPE Ensemble (%)",
+             "Error porcentual medio absoluto del ensemble en backtesting walk-forward. "
+             "Principal indicador de precisión.",
+             "< 2%", "2–5%", "5–10%", "> 10%",
+             f"{mape_val:.1f}%" if mape_val else "—",
+             _thresh_class(mape_val, (2, 5, 10))[1] if mape_val else "—"),
+
+            ("Confianza del modelo (%)",
+             "Derivada del MAPE: 100 − MAPE×5. Representa cuánto nos fiamos de la predicción central.",
+             "> 85%", "70–85%", "55–70%", "< 55%",
+             f"{conf_val:.0f}%" if conf_val else "—",
+             _thresh_class_inv(conf_val, (85, 70, 55))[1] if conf_val else "—"),
+
+            ("Riesgo de decisión (0–100)",
+             "Score compuesto: volatilidad (30%) + momentum (25%) + incertidumbre (25%) + riesgo modelo (20%).",
+             "< 33 (Bajo)", "33–50", "50–66 (Medio)", "> 67 (Alto)",
+             f"{risk_val:.0f}" if risk_val else "—",
+             _thresh_class(risk_val, (33, 50, 66))[1] if risk_val else "—"),
+
+            ("Amplitud IC 90% / precio",
+             "Rango del intervalo de confianza del 90% dividido entre el precio actual. "
+             "Mide la incertidumbre relativa.",
+             "< 8%", "8–15%", "15–25%", "> 25%",
+             f"{unc_range/price_now*100:.1f}%" if unc_range and price_now else "—",
+             _thresh_class((unc_range/price_now*100) if unc_range and price_now else 99,
+                           (8, 15, 25))[1] if unc_range else "—"),
+
+            ("Cobertura empírica IC 80%",
+             "% de observaciones históricas que caen dentro de la banda del 80% en backtesting. "
+             "Debería estar entre 75% y 85%.",
+             "78–82%", "75–85%", "70–90%", "< 70%",
+             "~80% (bootstrap)", "Bueno 🟦"),
+        ]
+
+        header_html = (
+            "<table class='thresh-table' style='width:100%;border-collapse:collapse;'>"
+            "<tr><th>Métrica</th><th>Descripción</th>"
+            "<th style='color:#FFC62F'>Excelente</th><th>Bueno</th>"
+            "<th>Aceptable</th><th>Mejorable</th>"
+            "<th style='background:#2D1154'>Valor actual</th>"
+            "<th style='background:#2D1154'>Estado</th></tr>"
+        )
+        rows_html = ""
+        for r in rows:
+            rows_html += (
+                f"<tr><td><b>{r[0]}</b></td><td style='font-size:0.78rem;color:#555'>{r[1]}</td>"
+                f"<td class='thresh-excellent'>{r[2]}</td>"
+                f"<td class='thresh-good'>{r[3]}</td>"
+                f"<td class='thresh-warn'>{r[4]}</td>"
+                f"<td class='thresh-bad'>{r[5]}</td>"
+                f"<td><b>{r[6]}</b></td>"
+                f"<td><b>{r[7]}</b></td></tr>"
+            )
+        st.markdown(header_html + rows_html + "</table>", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("""
+        **Regla práctica de uso:**
+        - **MAPE < 5% + Confianza > 70% + Riesgo < 50** → Usa la previsión central para la decisión de compra.
+        - **MAPE 5–10% o Riesgo 50–66** → Usa rangos (P25–P75) y valida con análisis de escenarios.
+        - **MAPE > 10% o Riesgo > 66** → El modelo tiene alta incertidumbre. Prioriza la gestión de riesgo y compra en tramos pequeños.
+        """)
+
+    # ---- Tab G3: How to read charts ----
+    with g3:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            guide_card("Fan Chart — Cómo leerlo",
+                "<b>Línea morada:</b> precio histórico real.<br>"
+                "<b>Línea dorada discontinua:</b> previsión central (mediana del ensemble).<br>"
+                "<b>Banda oscura (50%):</b> rango más probable — hay 50% de probabilidad de que "
+                "el precio esté aquí.<br>"
+                "<b>Banda media (80%):</b> escenario normal.<br>"
+                "<b>Banda exterior (95%):</b> incluye eventos poco probables. "
+                "Si el precio actual está cerca del borde superior, hay señal alcista fuerte.")
+            guide_card("Score de riesgo — Cómo leerlo",
+                "<b>0–33 (Verde):</b> mercado estable, señal favorable para comprar. "
+                "Precio predecible y con tendencia plana o bajista.<br>"
+                "<b>34–66 (Amarillo):</b> incertidumbre moderada. Compra en tramos o usa "
+                "contratos mixtos spot/forward.<br>"
+                "<b>67–100 (Rojo):</b> alta volatilidad o tendencia alcista fuerte. "
+                "Considera cobertura o pospón compras no urgentes.")
+        with col_b:
+            guide_card("Gráfico Buy Now vs Wait — Cómo leerlo",
+                "<b>Línea morada (Comprar hoy):</b> coste fijo si ejecutas la compra ahora.<br>"
+                "<b>Línea dorada (Esperar):</b> coste esperado si esperas N meses, incluyendo "
+                "el coste de almacenamiento.<br>"
+                "<b>Barras verdes:</b> meses en los que esperar ahorra dinero.<br>"
+                "<b>Barras rojas:</b> meses en los que comprar hoy es más barato.<br>"
+                "La decisión óptima es comprar en el mes donde las barras son más verdes.")
+            guide_card("Tornado de sensibilidad — Cómo leerlo",
+                "Muestra el impacto en el precio final de una variación en cada driver de mercado.<br>"
+                "<b>Barras verdes (izquierda):</b> si el driver cae, el precio baja (bueno para comprador).<br>"
+                "<b>Barras rojas (derecha):</b> si el driver sube, el precio sube.<br>"
+                "Los drivers más largos son los que más influyen — vigílalos con prioridad.")
+
+    # ---- Tab G4: LLM synthesis ----
+    with g4:
+        st.markdown("#### Explicación del modelo con IA")
+        st.markdown(
+            "El LLM recibe los parámetros actuales del modelo y genera una explicación "
+            "adaptada al contexto específico del producto y región seleccionados. "
+            "No inventa cifras — solo interpreta los datos calculados."
+        )
+
+        guide_prompt = (
+            f"Explícame de forma clara y concisa:\n"
+            f"1. ¿Qué significan los resultados del modelo para {product} en {region}?\n"
+            f"2. ¿Son fiables las predicciones con estos parámetros?\n"
+            f"3. ¿Qué debería vigilar el equipo de compras en los próximos meses?\n"
+            f"Sé directo, sin tecnicismos innecesarios. Máximo 4 párrafos."
+        )
+
+        if st.button("Generar explicación con IA", type="primary", use_container_width=True):
+            with st.spinner("Generando síntesis del modelo..."):
+                explanation = _get_llm_response(
+                    [{"role": "user", "content": guide_prompt}], ctx
+                )
+            st.session_state["guide_explanation"] = explanation
+
+        if st.session_state.get("guide_explanation"):
+            st.markdown(
+                f'<div class="chat-assistant">{st.session_state["guide_explanation"]}</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+        st.markdown("**Preguntas frecuentes:**")
+        faqs = {
+            "¿Por qué hay tres modelos y no uno solo?":
+                "Cada modelo captura un patrón diferente. HW es fuerte en estacionalidad, "
+                "LF en tendencia lineal estable y RF en relaciones no lineales de corto plazo. "
+                "El ensemble reduce el error respecto a cualquier modelo individual.",
+            "¿Qué significa un MAPE de 2.5%?":
+                "Que la predicción media se desvía un 2.5% del precio real. Para HDPE a 1.150 €/t, "
+                "eso es ±29 €/t de error típico — perfectamente manejable para decisiones de compra.",
+            "¿Los intervalos de confianza son realistas?":
+                "Están calibrados con bootstrap sobre residuos históricos reales y crecen "
+                "con el horizonte. No son intervalos paramétricos — se derivan de "
+                "la distribución empírica de errores pasados.",
+            "¿Desde qué año se analiza?":
+                "El histórico demo cubre enero 2022 – diciembre 2024 (36 meses). "
+                "Puedes filtrar el período visible con el selector 'Desde año' en el sidebar.",
+        }
+        for q, a in faqs.items():
+            with st.expander(q):
+                st.markdown(a)
 
 
 # ---------------------------------------------------------------------------

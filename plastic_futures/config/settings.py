@@ -1,56 +1,68 @@
 """
 Global settings, brand constants, and app configuration.
+Minnesota Vikings colour theme.
 """
 
 # ---------------------------------------------------------------------------
-# Repsol brand palette
+# Minnesota Vikings palette
 # ---------------------------------------------------------------------------
-REPSOL_ORANGE   = "#FF6600"
-REPSOL_MAGENTA  = "#D4006A"
-REPSOL_BLUE     = "#003087"
-IVORY           = "#FAFAF5"
-IVORY_DARK      = "#F0F0E8"
-DARK_NAVY       = "#1A1A2E"
-SUCCESS_GREEN   = "#00B894"
-WARNING_AMBER   = "#FDCB6E"
-DANGER_RED      = "#E17055"
-MID_GRAY        = "#8395A7"
+REPSOL_ORANGE   = "#FFC62F"   # Vikings Gold  (primary accent)
+REPSOL_MAGENTA  = "#7B5EA7"   # Vikings Medium Purple
+REPSOL_BLUE     = "#4F2683"   # Vikings Deep Purple (primary)
+IVORY           = "#F5F0FF"   # Light lavender background
+IVORY_DARK      = "#EDE5FF"   # Slightly darker lavender
+DARK_NAVY       = "#2D1154"   # Very dark purple
+SUCCESS_GREEN   = "#00B894"   # Semantic green (universal)
+WARNING_AMBER   = "#FFC62F"   # Gold doubles as warning
+DANGER_RED      = "#E17055"   # Semantic red (universal)
+MID_GRAY        = "#8395A7"   # Neutral gray
 
-# Plotly sequential colourscale using brand colours
+# Convenience aliases with explicit Vikings names
+VIKINGS_PURPLE  = "#4F2683"
+VIKINGS_GOLD    = "#FFC62F"
+VIKINGS_MID     = "#7B5EA7"
+VIKINGS_DARK    = "#2D1154"
+VIKINGS_LIGHT   = "#F5F0FF"
+
+# Plotly sequential colourscale: dark purple → medium purple → gold
 COLORSCALE = [
-    [0.0,  "#003087"],   # Repsol Blue  (low)
-    [0.35, "#FF6600"],   # Orange       (mid-low)
-    [0.65, "#D4006A"],   # Magenta      (mid-high)
-    [1.0,  "#1A1A2E"],   # Dark navy    (high)
+    [0.0,  "#2D1154"],   # dark purple  (low)
+    [0.40, "#4F2683"],   # deep purple  (mid-low)
+    [0.70, "#7B5EA7"],   # medium purple(mid-high)
+    [1.0,  "#FFC62F"],   # gold         (high)
 ]
 
 COLORSCALE_DIVERGING = [
     [0.0,  SUCCESS_GREEN],
-    [0.5,  "#FAFAF5"],
+    [0.5,  "#F5F0FF"],
     [1.0,  DANGER_RED],
 ]
 
 # Fan-chart band colours (low opacity fills)
 BAND_COLORS = {
-    "95": "rgba(212, 0, 106, 0.10)",   # magenta  95 % CI
-    "80": "rgba(255, 102, 0, 0.18)",   # orange   80 % CI
-    "50": "rgba(0, 48, 135, 0.22)",    # blue     50 % CI
+    "95": "rgba(79, 38, 131, 0.09)",    # purple  95 % CI
+    "80": "rgba(255, 198, 47, 0.18)",   # gold    80 % CI
+    "50": "rgba(45, 17, 84, 0.22)",     # dark purple 50 % CI
 }
-FORECAST_LINE_COLOR = REPSOL_ORANGE
-HISTORY_LINE_COLOR  = REPSOL_BLUE
+FORECAST_LINE_COLOR = REPSOL_ORANGE     # Gold forecast line
+HISTORY_LINE_COLOR  = REPSOL_BLUE       # Purple history line
 
 # ---------------------------------------------------------------------------
 # App metadata
 # ---------------------------------------------------------------------------
 PAGE_CONFIG = dict(
     page_title="Plastic Futures Decision Hub",
-    page_icon="🛢️",
+    page_icon="🏈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 APP_TITLE    = "Plastic Futures Decision Hub"
-APP_SUBTITLE = "Compras & Planificación · Repsol"
+APP_SUBTITLE = "Compras & Planificación · Market Intelligence"
+
+# Data history starts this year (demo data begins Jan 2022)
+DATA_START_YEAR = 2022
+DATA_END_YEAR   = 2024
 
 # ---------------------------------------------------------------------------
 # Domain constants

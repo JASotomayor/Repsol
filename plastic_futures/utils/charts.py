@@ -41,6 +41,49 @@ def _hex_to_rgba(hex_color: str, alpha: float = 1.0) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
+# ---------------------------------------------------------------------------
+# Time filter helper  (used by all temporal charts)
+# ---------------------------------------------------------------------------
+
+def apply_time_filter(
+    series: pd.Series,
+    from_year: int = 2022,
+    granularity: str = "Mensual",
+) -> pd.Series:
+    """
+    Filter a DatetimeIndex Series to start from `from_year` and
+    optionally resample to quarterly or annual frequency.
+    """
+    s = series[series.index.year >= from_year].copy()
+    if s.empty:
+        return s
+    if granularity == "Trimestral":
+        s = s.resample("QS").mean()
+    elif granularity == "Anual":
+        s = s.resample("YS").mean()
+    return s
+
+
+def apply_time_filter_df(
+    df: pd.DataFrame,
+    date_col: str = "date",
+    from_year: int = 2022,
+    granularity: str = "Mensual",
+) -> pd.DataFrame:
+    """Apply time filter to a DataFrame that has a date column."""
+    df = df[df[date_col].dt.year >= from_year].copy()
+    if granularity != "Mensual":
+        freq = "QS" if granularity == "Trimestral" else "YS"
+        numeric_cols = df.select_dtypes("number").columns.tolist()
+        df = (
+            df.set_index(date_col)[numeric_cols]
+            .resample(freq).mean()
+            .reset_index()
+            .rename(columns={"index": date_col})
+        )
+    return df
+
+
 def _base_layout(title: str = "", height: int = 420) -> dict:
     return dict(
         title=dict(text=title, font=dict(size=14, color=DARK_NAVY, family="Inter, sans-serif")),
@@ -64,11 +107,19 @@ def fan_chart(
     title: str = "Previsión de precio",
     unit: str = "€/ton",
     product: str = "",
+    from_year: int = 2022,
+    granularity: str = "Mensual",
+    active_months: list[int] | None = None,
 ) -> go.Figure:
     """
     Fan chart combining historical prices with probabilistic forecast bands.
     forecast columns expected: q_5, q_10, q_25, q_50, q_75, q_90, q_95, mean
     """
+    # Apply time filter to the displayed history window
+    history = apply_time_filter(history, from_year, granularity)
+    if active_months:
+        history = history[history.index.month.isin(active_months)]
+
     fig = go.Figure()
 
     # ---- 95 % band ----
@@ -139,6 +190,9 @@ def multi_product_lines(
     products: list[str],
     region: str,
     title: str = "Histórico de precios",
+    from_year: int = 2022,
+    granularity: str = "Mensual",
+    active_months: list[int] | None = None,
 ) -> go.Figure:
     fig = go.Figure()
     for prod in products:
@@ -146,10 +200,17 @@ def multi_product_lines(
         if subset.empty:
             continue
         series = subset.groupby("date")["market_price"].mean().sort_index()
+        series = apply_time_filter(series, from_year, granularity)
+        if active_months:
+            series = series[series.index.month.isin(active_months)]
+        if series.empty:
+            continue
+        mode = "lines+markers" if granularity == "Anual" else "lines"
         fig.add_trace(go.Scatter(
             x=series.index, y=series.values,
-            mode="lines", name=prod,
+            mode=mode, name=prod,
             line=dict(color=_PRODUCT_COLORS.get(prod, REPSOL_BLUE), width=2),
+            marker=dict(size=6),
         ))
     layout = _base_layout(title, height=380)
     layout["yaxis"]["title"] = "€/ton"

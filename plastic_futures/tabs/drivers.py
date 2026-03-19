@@ -10,16 +10,20 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 
-from utils.styling import section_header
-from utils.charts import correlation_heatmap, feature_importance_chart
+from utils.styling import section_header, time_filter_info
+from utils.charts import correlation_heatmap, feature_importance_chart, apply_time_filter
 from data.demo_data import get_product_series
 from config.settings import REPSOL_ORANGE, REPSOL_BLUE, REPSOL_MAGENTA, DARK_NAVY, IVORY
 
 
 def render(data: dict, filters: dict) -> None:
-    product = filters["product"]
-    region  = filters["region"]
-    products = filters["products"]
+    product       = filters["product"]
+    region        = filters["region"]
+    products      = filters["products"]
+    from_year     = filters.get("from_year", 2022)
+    granularity   = filters.get("granularity", "Mensual")
+    active_months = filters.get("active_months")
+    quarter_label = filters.get("quarter_label", "Todos")
 
     prices_df = data["prices"]
     market_df = data["market"]
@@ -108,6 +112,7 @@ def render(data: dict, filters: dict) -> None:
     # 2. Driver time series panel
     # -----------------------------------------------------------------------
     section_header("Evolución temporal de drivers clave")
+    time_filter_info(from_year, granularity, quarter_label if quarter_label != "Todos" else "")
 
     driver_list = ["oil_usd_bbl", "gas_eur_mwh", "pmi_manuf", "demand_index"]
     driver_labels = {
@@ -127,12 +132,18 @@ def render(data: dict, filters: dict) -> None:
     for i, (drv, label) in enumerate(driver_labels.items()):
         with cols_d[i % 2]:
             series_d = market_df.set_index("date")[drv]
+            # Apply time filter
+            series_d = apply_time_filter(series_d, from_year, granularity)
+            if active_months:
+                series_d = series_d[series_d.index.month.isin(active_months)]
+            mode_d = "lines+markers" if granularity == "Anual" else "lines"
             fig_d = go.Figure()
             fig_d.add_trace(go.Scatter(
                 x=series_d.index, y=series_d.values,
-                mode="lines", fill="tozeroy",
-                fillcolor=f"rgba{_hex_to_rgba(driver_colors[drv], 0.12)}",
+                mode=mode_d, fill="tozeroy",
+                fillcolor=_hex_to_rgba(driver_colors[drv], 0.12),
                 line=dict(color=driver_colors[drv], width=2),
+                marker=dict(size=5),
                 name=label,
             ))
             # Add a reference line for threshold if PMI

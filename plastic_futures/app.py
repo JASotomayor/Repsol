@@ -1,6 +1,6 @@
 """
 Plastic Futures Decision Hub
-Compras & Planificación · Repsol
+Compras & Planificación · Market Intelligence
 
 Entry point. Run with:
     streamlit run app.py
@@ -13,7 +13,10 @@ from config.settings import PAGE_CONFIG
 st.set_page_config(**PAGE_CONFIG)
 
 # ── Imports ────────────────────────────────────────────────────────────────
-from config.settings import PRODUCTS, SUPPLIERS, REGIONS, HORIZONS, SCENARIOS, CHART_TYPES
+from config.settings import (
+    PRODUCTS, SUPPLIERS, REGIONS, HORIZONS, SCENARIOS, CHART_TYPES,
+    DATA_START_YEAR, DATA_END_YEAR,
+)
 from data.demo_data import load_demo_data
 from utils.styling import apply_custom_css, render_header, render_sidebar_brand
 
@@ -82,6 +85,42 @@ with st.sidebar:
         index=0,
     )
 
+    # ── Período de análisis ──────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### Período de análisis")
+
+    available_years = list(range(DATA_START_YEAR, DATA_END_YEAR + 1))
+    from_year = st.selectbox(
+        "Desde año",
+        available_years,
+        index=0,
+        help=f"Los datos históricos arrancan en {DATA_START_YEAR}",
+    )
+
+    granularity = st.radio(
+        "Granularidad",
+        ["Mensual", "Trimestral", "Anual"],
+        horizontal=True,
+        help="Agrupa los datos en la vista histórica",
+    )
+
+    # Quarter filter (only meaningful when Trimestral or Mensual)
+    quarters_opts = ["Todos", "Q1 (Ene–Mar)", "Q2 (Abr–Jun)", "Q3 (Jul–Sep)", "Q4 (Oct–Dic)"]
+    quarter_filter = st.selectbox(
+        "Filtrar trimestre",
+        quarters_opts,
+        index=0,
+        help="Muestra solo los meses de ese trimestre en el histórico",
+    )
+    quarter_months = {
+        "Todos": None,
+        "Q1 (Ene–Mar)": [1, 2, 3],
+        "Q2 (Abr–Jun)": [4, 5, 6],
+        "Q3 (Jul–Sep)": [7, 8, 9],
+        "Q4 (Oct–Dic)": [10, 11, 12],
+    }
+    active_months = quarter_months[quarter_filter]
+
     st.markdown("---")
 
     # Quick price snapshot
@@ -111,21 +150,27 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<div style='font-size:0.65rem; color:#546E7A; text-align:center;'>"
-        "Datos demo 2022-2024 · Modelos: HW + LF + RF<br>"
-        "v1.0 · Repsol Compras & Planificación"
+        "<div style='font-size:0.65rem; color:#C9B8F0; text-align:center;'>"
+        f"Datos demo {DATA_START_YEAR}–{DATA_END_YEAR}<br>"
+        "Modelos: HW + Fourier LR + Random Forest<br>"
+        "v1.0 · Market Intelligence"
         "</div>",
         unsafe_allow_html=True,
     )
 
 # ── Filters dict (shared across all tabs) ────────────────────────────────────
 filters = {
-    "product":    product,
-    "products":   products,
-    "region":     region,
-    "horizon":    horizon,
-    "scenario":   scenario,
-    "chart_type": chart_type,
+    "product":        product,
+    "products":       products,
+    "region":         region,
+    "horizon":        horizon,
+    "scenario":       scenario,
+    "chart_type":     chart_type,
+    # Time period filters
+    "from_year":      from_year,
+    "granularity":    granularity,
+    "active_months":  active_months,   # None = all, or list[int] for a quarter
+    "quarter_label":  quarter_filter,
 }
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -139,7 +184,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🔮 Escenarios",
     "🔍 Drivers",
     "📋 Seguimiento",
-    "💬 Chat / Insights",
+    "💬 Chat / Guía del modelo",
 ])
 
 with tab1:

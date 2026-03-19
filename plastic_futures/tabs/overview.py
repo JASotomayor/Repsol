@@ -9,26 +9,37 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from utils.styling import kpi_card, section_header, alert_box
-from utils.charts import multi_product_lines, heatmap_chart
+from utils.styling import kpi_card, section_header, alert_box, time_filter_info
+from utils.charts import multi_product_lines, heatmap_chart, apply_time_filter
 from models.risk_scoring import build_risk_heatmap
 from config.settings import REPSOL_ORANGE, REPSOL_BLUE, SUCCESS_GREEN, DANGER_RED, WARNING_AMBER
 
 
 def render(data: dict, filters: dict) -> None:
-    product  = filters["product"]
-    region   = filters["region"]
-    products = filters["products"]
+    product       = filters["product"]
+    region        = filters["region"]
+    products      = filters["products"]
+    from_year     = filters.get("from_year", 2022)
+    granularity   = filters.get("granularity", "Mensual")
+    active_months = filters.get("active_months")
+    quarter_label = filters.get("quarter_label", "Todos")
 
     prices_df = data["prices"]
     market_df = data["market"]
     alerts_df = data["alerts"]
 
     # -----------------------------------------------------------------------
-    # Current price stats for selected product / region
+    # Current price stats for selected product / region (always full series for KPIs)
     # -----------------------------------------------------------------------
     subset = prices_df[(prices_df["product"] == product) & (prices_df["region"] == region)]
-    market_series = subset.groupby("date")["market_price"].mean().sort_index()
+    market_series_full = subset.groupby("date")["market_price"].mean().sort_index()
+
+    # Filtered view for charts
+    market_series_chart = apply_time_filter(market_series_full, from_year, granularity)
+    if active_months:
+        market_series_chart = market_series_chart[market_series_chart.index.month.isin(active_months)]
+
+    market_series = market_series_full   # KPIs always use full series
 
     latest_price = market_series.iloc[-1]
     prev_price   = market_series.iloc[-2]
@@ -94,7 +105,11 @@ def render(data: dict, filters: dict) -> None:
 
     with col_left:
         section_header("Histórico de precios por producto")
-        fig = multi_product_lines(prices_df, products, region)
+        time_filter_info(from_year, granularity, quarter_label if quarter_label != "Todos" else "")
+        fig = multi_product_lines(
+            prices_df, products, region,
+            from_year=from_year, granularity=granularity, active_months=active_months,
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
